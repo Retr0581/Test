@@ -1,0 +1,155 @@
+#include <iostream>
+#include <vector>
+#include <random>
+#include <ctime>
+#include <cmath>
+using namespace std;
+const double EPS = 1e-12;
+
+void show (vector<double> A, int n, int N){
+    printf("\n");
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < N; j++) {
+            printf("%lf ",A[i * N + j]);
+        }
+        printf("\n");
+    }
+}
+
+int main() {
+    int n;
+    cout << "Введите размерность матрицы: ";
+    cin >> n;
+
+    if (n <= 0) {
+        cout << "Ошибка: размерность должна быть > 0\n";
+        return 1;
+    }
+
+    cout << "Генерация матрицы " << n << "x" << n << "...\n";
+    vector<double> A(n * n);
+    
+    // делаем матрицу nxn
+    mt19937 gen(time(nullptr));
+    uniform_real_distribution<double> dist(-1.0, 1.0);
+
+    for (int i = 0; i < n; i++) {
+        double row_sum = 0.0;
+        for (int j = 0; j < n; j++) {
+            if (i != j) {
+                A[i * n + j] = dist(gen);
+                row_sum += fabs(A[i * n + j]);
+            }
+        }
+        A[i * n + i] = row_sum + n * 10.0;
+    }
+    cout << "\nИсходная матрица (произвольная):\n";
+    //вывод в консоль
+    show (A, n, n);
+    
+    int N = 2 * n;
+    vector<double> B(n * N, 0.0);
+
+    // делаем расширенную (с единичной матрицей справа)
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            B[i * N + j] = A[i * n + j];
+        }
+        B[i * N + (n + i)] = 1.0;
+    }
+
+    cout << "\nРасширенная матрица (A|I):\n";
+    show (B, n, N);
+
+    // Жордан-Гаусс
+    cout << "\nВычисление обратной матрицы...\n";
+    clock_t start = clock();
+    
+    for (int i = 0; i < n; ++i) {
+        int pivot_row = i;
+        double max_val = fabs(B[i * N + i]);
+
+        for (int k = i + 1; k < n; k++) {
+            double val = fabs(B[k * N + i]);
+            if (val > max_val) {
+                max_val = val;
+                pivot_row = k;
+            }
+        }
+
+        if (max_val < EPS){
+            cout << "Матрица вырожденная, обратной нет.\n";
+            return 1;
+        }
+
+        if (pivot_row != i) {
+            for (int j = i; j < N; j++) {
+                double temp = B[i * N + j];
+                B[i * N + j] = B[pivot_row * N + j];
+                B[pivot_row * N + j] = temp;
+            }
+        }
+
+        double inv_pivot = B[i * N + i];
+        for (int j = i; j < N; j++) {
+            B[i * N + j] /= inv_pivot;
+        }
+
+        for (int k = 0; k < n; k++) {
+            double factor = B[k * N + i];
+            if ((k != i) && (fabs(factor) > EPS)){
+                for (int j = i; j < N; j++) {
+                    B[k * N + j] -= factor * B[i * N + j];
+                }
+            }
+        }
+    }
+
+    clock_t finish = clock();
+    double t = (finish - start) / (double)CLOCKS_PER_SEC;
+
+   show (B, n, N);
+
+    
+
+    cout << "\nВычисление завершено.\n";
+    cout << "Время выполнения: " << fixed << t << " секунд\n";
+    cout << "\nНайденная обратная матрица:\n";
+    // достаем обратную из правой части
+    vector<double> inv(n * n);
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            inv[i * n + j] = B[i * N + n + j];
+            printf("%lf ", inv[i * n + j]); 
+        }
+        printf("\n");
+    }
+
+    cout << "\nПроверка правильности...\n";
+    vector<double> Check(n * n, 0.0);
+    
+    // умножаем на обратную
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            for (int k = 0; k < n; k++) {
+                Check[i * n + j] += A[i * n + k] * inv[k * n + j];
+            }
+        }
+    }
+
+    // сравниваем с единичной матрицей
+    double max_error = 0.0;
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            double expected = (i == j) ? 1.0 : 0.0;
+            double error = fabs(Check[i * n + j] - expected);
+            if (error > max_error) {
+                max_error = error;
+            }
+        }
+    }
+
+    cout << "Результат проверки: " << scientific << max_error << endl;
+
+    return 0;
+}
